@@ -1,0 +1,88 @@
+#! python2
+# coding=UTF-8
+'''
+Multi-scale interaction
+Three Scales: Extent, Resolution, Classification
+Based on ArcGIS 10.x
+LUCC data
+Automatic Extraction
+'''
+
+import arcpy
+from arcpy.sa import *
+from arcpy.da import *
+import os
+import gc
+import math
+import numpy as np
+import pandas as pd
+import csv
+from collections import Counter
+
+#Input parameters
+#1\ Create random points (1000 points)
+
+inputpath=r"D:/landscape_scale.gdb"#Target raster path
+linshi=r"D:/xlinshi.gdb"#Cached database
+resolution=["30","100","500","1000","2000"]
+classnumber=["6","12","17","24"]
+extent=[5,10,20,30,40,50]#km
+name="lucc"
+outfile=r"e:/points1k/multi_factors_test_ex30_2"#OUTPUT FILES
+#Environment variable
+arcpy.CheckOutExtension("spatial")
+arcpy.env.workspace=inputpath
+arcpy.env.parallProcessingFactor = "50%"
+arcpy.gp.overwriteOutput = True
+innerfeature=r"D:\..."#Spatial region of sampling sites, it is spatial verctor file, such as ".shp" file.
+sourceSR = arcpy.Describe(innerfeature).spatialReference
+arcpy.env.outputCoordinateSystem = sourceSR
+#1/ Arcpy
+for ex in extent:
+    arcpy.CreateRandomPoints_management(linshi,"points1k"+str(ex),innerfeature,"",1000)
+    shppath = os.path.join(linshi, "Sites"+str(ex))
+    arcpy.Buffer_analysis(os.path.join(linshi,"points1k"),shppath,str(ex*1000)+" Meter","FULL","ROUND","NONE")
+
+    # Clipping
+    for sl in resolution:
+        for cl in classnumber:
+            luccpath = r"D:/LUCC.gdb"#luccdataset
+            #LUCC for the corresponding scales
+            luccraster = Raster(os.path.join(luccpath,str(ex)+str(sl)+str(cl)))
+
+            print(shppath)
+            number=1
+            with arcpy.da.SearchCursor(shppath, ["OID@", "SHAPE@"]) as cursor:
+                for row in cursor:
+                    print(number)
+                    e = row[1].extent
+                    ExtStr = str(e.XMin) + " " + str(e.YMin) + " " + str(e.XMax) + " " + str(e.YMax)
+                    outcli = os.path.join(outfile, "sl" + sl + "_cl" + cl + "_ex" + str(ex)+str(number)+".tif")
+                    arcpy.Clip_management(luccraster, ExtStr, outcli, row[1],
+                                          "",
+                                          "ClippingGeometry",
+                                          "NO_MAINTAIN_EXTENT")
+                    number += 1
+            del gc.garbage[:]
+            gc.collect()
+
+# 2/ Linking Fragstats4.2 softwar for bach calculation
+outfile_frag=r"D:/..."# The batch file. It is the ".fbt"  files.
+number=1
+for sl in resolution:
+    for cl in classnumber:
+        inputfile2 = outfile + "_sl" + sl + "_cl" + cl
+        with open(os.path.join(outfile_frag, "lucc_multi_facotrs3_" + str(number) + ".csv"),
+                  "wb") as myFile:  # 默认是Excel格式读取
+            print(number)
+            number += 1
+            for ex in extent:
+                for i in range(1, 1001):
+                    namelist = ["x", 999, "x", "x", 1, "x", "IDF_GeoTIFF"]
+                    name =os.path.join(inputfile2,"sl" + sl + "_cl" + cl + "_ex" + str(ex)+str(i)+".tif")
+                    namelist.insert(0, name)
+                    # print(namelist)
+                    myWtiter =csv.writer(myFile)
+                    myWtiter.writerow(namelist)
+# Correct the ".csv" file suffix in the outfile_frag to ".fbt".
+# Next, using Fragtats 4.2 to calculate 12 landscape metrics.
