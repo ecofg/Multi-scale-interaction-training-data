@@ -38,18 +38,16 @@ innerfeature=r"D:\..."#Spatial region of sampling sites, it is spatial verctor f
 sourceSR = arcpy.Describe(innerfeature).spatialReference
 arcpy.env.outputCoordinateSystem = sourceSR
 #1/ Arcpy
-for ex in extent:
-    arcpy.CreateRandomPoints_management(linshi,"points1k"+str(ex),innerfeature,"",1000)
-    shppath = os.path.join(linshi, "Sites"+str(ex))
-    arcpy.Buffer_analysis(os.path.join(linshi,"points1k"),shppath,str(ex*1000)+" Meter","FULL","ROUND","NONE")
-
-    # Clipping
-    for sl in resolution:
-        for cl in classnumber:
-            luccpath = r"D:/LUCC.gdb"#luccdataset
-            #LUCC for the corresponding scales
-            luccraster = Raster(os.path.join(luccpath,str(ex)+str(sl)+str(cl)))
-
+for sl in resolution:
+    for cl in classnumber:
+        luccpath = r"D:/LUCC.gdb"#luccdataset
+        #LUCC for the corresponding scales
+        luccraster = Raster(os.path.join(luccpath,str(ex)+str(sl)+str(cl)))
+        for ex in extent:
+            arcpy.CreateRandomPoints_management(linshi,"points1k"+str(ex),innerfeature,"",1000)
+            shppath = os.path.join(linshi, "Sites"+str(ex))
+            arcpy.Buffer_analysis(os.path.join(linshi,"points1k"),shppath,str(ex*1000)+" Meter","FULL","ROUND","NONE")
+            # Clipping
             print(shppath)
             number=1
             with arcpy.da.SearchCursor(shppath, ["OID@", "SHAPE@"]) as cursor:
